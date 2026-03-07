@@ -102,6 +102,13 @@ Add one of the following blocks to your `claude_desktop_config.json`.
 
 ## Exposed Tools
 
+### `resolve_ocid`
+Resolves a compute instance or load balancer OCID to its human-readable name and key attributes. The resource type is detected automatically from the OCID prefix.
+- `ocid` — The full OCID to resolve (e.g. `ocid1.instance.oc1...` or `ocid1.loadbalancer.oc1...`).
+
+Returns `display_name`, `lifecycle_state`, and resource-specific fields (shape, availability domain, IP addresses, etc.).
+
+
 ### `get_traffic_analytics`
 Returns aggregated traffic analytics from OCI logs.
 - `time_range` *(default: `"24h"`)* — How far back to look, e.g. `'1h'`, `'7d'`, `'2w'`.

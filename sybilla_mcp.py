@@ -81,20 +81,15 @@ _LOG_GROUP_ID    = os.environ["OCI_LOG_GROUP_ID"]
 _COMPARTMENT_ID  = os.environ["OCI_COMPARTMENT_ID"]
 
 
-def _get_logging_client() -> oci.loggingsearch.LogSearchClient:
-    """Build an authenticated OCI LogSearchClient.
-
-    Supports two authentication modes:
-      - user_principal:     reads ~/.oci/config (or OCI_CONFIG_FILE / OCI_CONFIG_PROFILE)
-      - instance_principal: uses the instance's own identity (no config file needed)
-    """
+def _get_oci_config() -> tuple[dict, Optional[oci.auth.signers.InstancePrincipalsSecurityTokenSigner]]:
+    """Return (config_dict, signer_or_None) for the configured auth type."""
     if _OCI_AUTH_TYPE == "instance_principal":
         signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
         config: dict = {}
         if _OCI_REGION_OVERRIDE:
             config["region"] = _OCI_REGION_OVERRIDE
         logger.info("Using Instance Principal authentication")
-        return oci.loggingsearch.LogSearchClient(config, signer=signer)
+        return config, signer
 
     # --- user_principal (default) ---
     config = oci.config.from_file(
@@ -105,6 +100,14 @@ def _get_logging_client() -> oci.loggingsearch.LogSearchClient:
         config["region"] = _OCI_REGION_OVERRIDE
     oci.config.validate_config(config)
     logger.info("Using User Principal authentication (config file)")
+    return config, None
+
+
+def _get_logging_client() -> oci.loggingsearch.LogSearchClient:
+    """Build an authenticated OCI LogSearchClient."""
+    config, signer = _get_oci_config()
+    if signer:
+        return oci.loggingsearch.LogSearchClient(config, signer=signer)
     return oci.loggingsearch.LogSearchClient(config)
 
 
@@ -350,6 +353,73 @@ def search_logs_raw(
         return {"time_range": time_range, "total": len(entries), "entries": entries}
     except Exception as exc:
         logger.exception("search_logs_raw failed")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def resolve_ocid(ocid: str) -> dict:
+    """
+    Resolve an OCI resource OCID to its human-readable display name.
+
+    Supports:
+      - Compute instances  (ocid1.instance.oc1...)
+      - Load balancers     (ocid1.loadbalancer.oc1...)
+
+    Args:
+        ocid: The full OCID of the resource to look up.
+
+    Returns:
+        A dict with 'ocid', 'resource_type', and 'display_name' keys,
+        or an 'error' key on failure.
+    """
+    if not ocid.startswith("ocid1."):
+        return {"error": f"'{ocid}' does not look like a valid OCID."}
+
+    # Derive resource type from the second segment of the OCID
+    # e.g. 'ocid1.instance.oc1...' -> 'instance'
+    try:
+        resource_type = ocid.split(".")[1].lower()
+    except IndexError:
+        return {"error": "Unable to parse resource type from OCID."}
+
+    try:
+        config, signer = _get_oci_config()
+        kwargs = {"signer": signer} if signer else {}
+
+        if resource_type == "instance":
+            client = oci.core.ComputeClient(config, **kwargs)
+            instance = client.get_instance(ocid).data
+            return {
+                "ocid": ocid,
+                "resource_type": "instance",
+                "display_name": instance.display_name,
+                "lifecycle_state": instance.lifecycle_state,
+                "shape": instance.shape,
+                "availability_domain": instance.availability_domain,
+            }
+
+        if resource_type == "loadbalancer":
+            client = oci.load_balancer.LoadBalancerClient(config, **kwargs)
+            lb = client.get_load_balancer(ocid).data
+            return {
+                "ocid": ocid,
+                "resource_type": "load_balancer",
+                "display_name": lb.display_name,
+                "lifecycle_state": lb.lifecycle_state,
+                "shape_name": lb.shape_name,
+                "ip_addresses": [ip.ip_address for ip in (lb.ip_addresses or [])],
+            }
+
+        return {
+            "error": f"Unsupported resource type '{resource_type}'. "
+                     f"Supported types: instance, loadbalancer."
+        }
+
+    except oci.exceptions.ServiceError as exc:
+        logger.exception("resolve_ocid failed (OCI ServiceError)")
+        return {"error": f"OCI error {exc.status}: {exc.message}"}
+    except Exception as exc:
+        logger.exception("resolve_ocid failed")
         return {"error": str(exc)}
 
 
