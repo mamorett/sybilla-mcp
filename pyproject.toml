@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sybilla-mcp"
+version = "0.1.0"
+description = "FastMCP server for querying Oracle Cloud Infrastructure (OCI) Logging"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=2.0",
+    "oci>=2.0",
+]
+
+[project.scripts]
+sybilla-mcp = "sybilla_mcp:main"
+
+[tool.hatch.build.targets.wheel]
+include = ["sybilla_mcp.py"]

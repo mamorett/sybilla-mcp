@@ -1,11 +1,4 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#   "fastmcp",
-#   "oci",
-# ]
-# ///
+#!/usr/bin/env python3
 """
 FastMCP server for Oracle Cloud Infrastructure (OCI) Logging.
 
@@ -363,5 +356,10 @@ def search_logs_raw(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-if __name__ == "__main__":
+def main() -> None:
+    """Console-script entry point used by uvx / pipx."""
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()
