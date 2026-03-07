@@ -4,7 +4,9 @@ A FastMCP server for querying Oracle Cloud Infrastructure (OCI) Logging. This se
 
 ## Prerequisites
 
-- **OCI CLI Config:** You must have an OCI configuration file (usually at `~/.oci/config`) with valid credentials.
+- **OCI Authentication (one of the following):**
+  - **User Principal (default):** An OCI configuration file (usually at `~/.oci/config`) with valid credentials.
+  - **Instance Principal:** The compute instance / container must belong to a Dynamic Group with an IAM policy granting access to the target log resources. No config file needed.
 - **uv:** This project uses `uv` for dependency management. If you don't have it, install it via:
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -23,11 +25,14 @@ The following environment variables are required for the server to function. The
 | `OCI_LOG_ID` | OCID of the specific OCI log to query | Yes |
 | `OCI_LOG_GROUP_ID` | OCID of the OCI log group containing the log | Yes |
 | `OCI_COMPARTMENT_ID` | OCID of the compartment | Yes |
-| `OCI_CONFIG_FILE` | Path to your OCI config (default: `~/.oci/config`) | No |
-| `OCI_CONFIG_PROFILE` | OCI profile name (default: `DEFAULT`) | No |
+| `OCI_AUTH_TYPE` | Authentication mode: `user_principal` (default) or `instance_principal` | No |
+| `OCI_CONFIG_FILE` | Path to your OCI config (default: `~/.oci/config`). *User principal only.* | No |
+| `OCI_CONFIG_PROFILE` | OCI profile name (default: `DEFAULT`). *User principal only.* | No |
 | `OCI_REGION` | Override the region specified in your OCI config | No |
 
 ### 2. Integration with Claude Desktop
+
+#### User Principal (default – uses `~/.oci/config`)
 
 Add the following to your `claude_desktop_config.json`:
 
@@ -50,6 +55,38 @@ Add the following to your `claude_desktop_config.json`:
   }
 }
 ```
+
+#### Instance Principal (for OCI Compute / OKE / Cloud Shell)
+
+When running on an OCI instance that belongs to a Dynamic Group with the
+appropriate IAM policies, set `OCI_AUTH_TYPE` to `instance_principal`.
+No OCI config file or API key is required.
+
+```json
+{
+  "mcpServers": {
+    "sybilla-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--script",
+        "/absolute/path/to/sybilla-mcp/sybilla_mcp.py"
+      ],
+      "env": {
+        "OCI_AUTH_TYPE": "instance_principal",
+        "OCI_LOG_ID": "ocid1.log.oc1...",
+        "OCI_LOG_GROUP_ID": "ocid1.loggroup.oc1...",
+        "OCI_COMPARTMENT_ID": "ocid1.compartment.oc1..."
+      }
+    }
+  }
+}
+```
+
+> **Note:** The compute instance must be in a [Dynamic Group](https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm) with a policy like:
+> ```
+> Allow dynamic-group <group-name> to read log-content in compartment <compartment-name>
+> ```
 
 ## Exposed Tools
 

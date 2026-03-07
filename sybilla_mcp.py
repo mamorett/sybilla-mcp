@@ -9,7 +9,18 @@
 """
 FastMCP server for Oracle Cloud Infrastructure (OCI) Logging.
 
-Authentication: Uses OCI config file (~/.oci/config) with DEFAULT profile (or OCI_CONFIG_PROFILE env var).
+Authentication:
+  Supports two authentication modes, controlled by OCI_AUTH_TYPE:
+
+  1. user_principal (default)
+     Uses OCI config file (~/.oci/config) with DEFAULT profile
+     (or OCI_CONFIG_PROFILE env var).
+
+  2. instance_principal
+     Uses the instance's own identity via Instance Principal.
+     No config file is needed; the instance must be in a Dynamic Group
+     with an appropriate IAM policy.  Ideal for running on OCI Compute,
+     OKE (Kubernetes), or Cloud Shell.
 
 Environment variables (set via MCP JSON config, NOT .env):
   Required:
@@ -18,8 +29,11 @@ Environment variables (set via MCP JSON config, NOT .env):
     OCI_COMPARTMENT_ID  - OCID of the compartment
 
   Optional:
+    OCI_AUTH_TYPE       - 'user_principal' (default) or 'instance_principal'
     OCI_CONFIG_FILE     - Path to OCI config file (default: ~/.oci/config)
+                          (user_principal only)
     OCI_CONFIG_PROFILE  - OCI config profile name (default: DEFAULT)
+                          (user_principal only)
     OCI_REGION          - Override region from config file
 """
 
@@ -52,9 +66,21 @@ mcp = FastMCP(
 # ---------------------------------------------------------------------------
 # OCI configuration (read once at import time)
 # ---------------------------------------------------------------------------
-_OCI_CONFIG_FILE    = os.environ.get("OCI_CONFIG_FILE", oci.config.DEFAULT_LOCATION)
-_OCI_CONFIG_PROFILE = os.environ.get("OCI_CONFIG_PROFILE", oci.config.DEFAULT_PROFILE)
+_OCI_AUTH_TYPE       = os.environ.get("OCI_AUTH_TYPE", "user_principal").lower()
 _OCI_REGION_OVERRIDE = os.environ.get("OCI_REGION")          # optional
+
+_VALID_AUTH_TYPES = {"user_principal", "instance_principal"}
+if _OCI_AUTH_TYPE not in _VALID_AUTH_TYPES:
+    raise ValueError(
+        f"OCI_AUTH_TYPE must be one of {_VALID_AUTH_TYPES}, got '{_OCI_AUTH_TYPE}'"
+    )
+
+# Config-file settings are only relevant for user_principal auth.
+# Avoid reading them (and referencing the default config path) when using
+# instance_principal, since no config file is expected to exist.
+if _OCI_AUTH_TYPE == "user_principal":
+    _OCI_CONFIG_FILE    = os.environ.get("OCI_CONFIG_FILE", oci.config.DEFAULT_LOCATION)
+    _OCI_CONFIG_PROFILE = os.environ.get("OCI_CONFIG_PROFILE", oci.config.DEFAULT_PROFILE)
 
 # Required identifiers – must be provided via MCP JSON env block
 _LOG_ID          = os.environ["OCI_LOG_ID"]
@@ -63,7 +89,21 @@ _COMPARTMENT_ID  = os.environ["OCI_COMPARTMENT_ID"]
 
 
 def _get_logging_client() -> oci.loggingsearch.LogSearchClient:
-    """Build an authenticated OCI LogSearchClient from the config file."""
+    """Build an authenticated OCI LogSearchClient.
+
+    Supports two authentication modes:
+      - user_principal:     reads ~/.oci/config (or OCI_CONFIG_FILE / OCI_CONFIG_PROFILE)
+      - instance_principal: uses the instance's own identity (no config file needed)
+    """
+    if _OCI_AUTH_TYPE == "instance_principal":
+        signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+        config: dict = {}
+        if _OCI_REGION_OVERRIDE:
+            config["region"] = _OCI_REGION_OVERRIDE
+        logger.info("Using Instance Principal authentication")
+        return oci.loggingsearch.LogSearchClient(config, signer=signer)
+
+    # --- user_principal (default) ---
     config = oci.config.from_file(
         file_location=_OCI_CONFIG_FILE,
         profile_name=_OCI_CONFIG_PROFILE,
@@ -71,6 +111,7 @@ def _get_logging_client() -> oci.loggingsearch.LogSearchClient:
     if _OCI_REGION_OVERRIDE:
         config["region"] = _OCI_REGION_OVERRIDE
     oci.config.validate_config(config)
+    logger.info("Using User Principal authentication (config file)")
     return oci.loggingsearch.LogSearchClient(config)
 
 
