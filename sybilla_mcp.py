@@ -33,6 +33,7 @@ Environment variables (set via MCP JSON config, NOT .env):
 import os
 import json
 import logging
+import socket
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -420,6 +421,26 @@ def resolve_ocid(ocid: str) -> dict:
         return {"error": f"OCI error {exc.status}: {exc.message}"}
     except Exception as exc:
         logger.exception("resolve_ocid failed")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def resolve_fqdn(fqdn: str) -> dict:
+    """
+    Resolve a Fully Qualified Domain Name (FQDN) to its IP address.
+
+    Args:
+        fqdn: The FQDN to resolve, e.g. 'google.com'.
+
+    Returns:
+        A dict with 'fqdn' and 'ip_address' keys, or an 'error' key on failure.
+    """
+    try:
+        ip_address = socket.gethostbyname(fqdn)
+        return {"fqdn": fqdn, "ip_address": ip_address}
+    except socket.gaierror as exc:
+        return {"error": f"Failed to resolve '{fqdn}': {exc}"}
+    except Exception as exc:
         return {"error": str(exc)}
 
 

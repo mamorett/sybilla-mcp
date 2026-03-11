@@ -109,6 +109,13 @@ Resolves a compute instance or load balancer OCID to its human-readable name and
 Returns `display_name`, `lifecycle_state`, and resource-specific fields (shape, availability domain, IP addresses, etc.).
 
 
+### `resolve_fqdn`
+Resolves a Fully Qualified Domain Name (FQDN) to its IP address.
+- `fqdn` — The FQDN to resolve, e.g. `'google.com'`.
+
+Returns `fqdn` and `ip_address`.
+
+
 ### `get_traffic_analytics`
 Returns aggregated traffic analytics from OCI logs.
 - `time_range` *(default: `"24h"`)* — How far back to look, e.g. `'1h'`, `'7d'`, `'2w'`.
