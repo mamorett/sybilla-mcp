@@ -174,8 +174,8 @@ def get_traffic_analytics(
 
     # Map logical group to OCI log field name
     field_map = {
-        "country":     "data.country",
-        "ip":          "data.clientip",
+        "country":     "data.Country",
+        "ip":          "data.IP",
         "status_code": "data.status",
         "path":        "data.request",
     }
@@ -183,7 +183,7 @@ def get_traffic_analytics(
 
     query = (
         f"search \"{_COMPARTMENT_ID}/{_LOG_GROUP_ID}/{_LOG_ID}\" "
-        f"| summarize count(*) as count by {field} "
+        f"| summarize count() by {field} "
         f"| sort by count desc"
     )
 
@@ -219,7 +219,7 @@ def search_logs_by_country(
     """
     query = (
         f"search \"{_COMPARTMENT_ID}/{_LOG_GROUP_ID}/{_LOG_ID}\" "
-        f"| where data.country = '{country}' "
+        f"| where data.Country = '{country}' "
         f"| sort by datetime desc"
     )
 
@@ -251,7 +251,7 @@ def search_logs_by_countries(
     quoted = ", ".join(f"'{c}'" for c in countries)
     query = (
         f"search \"{_COMPARTMENT_ID}/{_LOG_GROUP_ID}/{_LOG_ID}\" "
-        f"| where data.country in ({quoted}) "
+        f"| where data.Country in ({quoted}) "
         f"| sort by datetime desc"
     )
 
@@ -299,12 +299,12 @@ def search_logs_by_ip(
         return {"error": "Provide either ip_address or ip_range."}
 
     if ip_address:
-        where_clause = f"data.clientip = '{ip_address}'"
+        where_clause = f"data.IP = '{ip_address}'"
         label = ip_address
     else:
         # OCI search SQL doesn't natively support CIDR; filter by prefix
         prefix = ip_range.split("/")[0].rsplit(".", 1)[0]  # e.g. '10.0.0'
-        where_clause = f"data.clientip like '{prefix}.%'"
+        where_clause = f"data.IP like '{prefix}.%'"
         label = ip_range
 
     query = (
