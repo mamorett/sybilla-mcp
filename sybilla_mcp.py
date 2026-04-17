@@ -375,7 +375,7 @@ def list_sensors(
     """
     query = (
         f"search \"{_COMPARTMENT_ID}/{_LOG_GROUP_ID}/{_LOG_ID}\" "
-        f"| summarize count(*) as count by data.sensor "
+        f"| summarize count() by data.Sensor "
         f"| sort by count desc"
     )
 
@@ -384,7 +384,7 @@ def list_sensors(
 
         sensors = []
         for entry in entries:
-            sensor_name = entry.get("data.sensor", "")
+            sensor_name = entry.get("data.Sensor", "")
             count = entry.get("count", 0)
             sensors.append({"name": sensor_name, "count": count})
 
