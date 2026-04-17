@@ -1,6 +1,6 @@
 # sybilla-mcp
 
-A FastMCP server for querying Oracle Cloud Infrastructure (OCI) Logging. Provides tools for traffic analytics, country-based log searches, and IP-based filtering — usable directly from any MCP-compatible client (like Claude Desktop).
+A FastMCP server for querying Oracle Cloud Infrastructure (OCI) Logging. Provides tools for traffic analytics, sensor listing, country-based log searches, IP-based filtering, and raw query execution — usable directly from any MCP-compatible client (like Claude Desktop).
 
 ## Installation
 
@@ -144,6 +144,19 @@ Filters logs by an exact IP address or CIDR range.
 ### `search_logs_raw`
 Runs a free-form OCI Logging query (SQL-like syntax).
 - `query_filter` — Query fragment, e.g. `"| where data.status = '500' | sort by datetime desc"`.
+- `time_range` *(default: `"24h"`)*
+- `limit` *(default: `100`)*
+
+### `list_sensors`
+Returns all unique sensor names found in the logs within a time window.
+- `time_range` *(default: `"24h"`)* — How far back to look.
+- `limit` *(default: `1000`)* — Max raw log entries to consider (hard cap: 1000).
+
+Returns a list of `{name, count}` objects sorted by count descending, along with `total_sensors` and `total_entries`.
+
+### `search_logs_by_sensor`
+Filters logs by a specific sensor name (e.g. `'ssh_22'`, `'cowrie'`).
+- `sensor` — Sensor name to filter on.
 - `time_range` *(default: `"24h"`)*
 - `limit` *(default: `100`)*
 
