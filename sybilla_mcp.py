@@ -358,6 +358,79 @@ def search_logs_raw(
 
 
 @mcp.tool()
+def list_sensors(
+    time_range: str = "24h",
+    limit: int = 1000,
+) -> dict:
+    """
+    Return all unique sensor names found in the logs within a time window.
+
+    Args:
+        time_range: How far back to look, e.g. '24h', '7d', '2w'.
+        limit:      Maximum number of raw log entries to consider (max 1000).
+
+    Returns:
+        A dict with 'sensors' (list of {name, count}), 'total_sensors',
+        'time_range', and 'total_entries'.
+    """
+    query = (
+        f"search \"{_COMPARTMENT_ID}/{_LOG_GROUP_ID}/{_LOG_ID}\" "
+        f"| summarize count(*) as count by data.sensor "
+        f"| sort by count desc"
+    )
+
+    try:
+        entries = _execute_search(query, time_range, limit)
+
+        sensors = []
+        for entry in entries:
+            sensor_name = entry.get("data.sensor", "")
+            count = entry.get("count", 0)
+            sensors.append({"name": sensor_name, "count": count})
+
+        return {
+            "sensors": sensors,
+            "total_sensors": len(sensors),
+            "time_range": time_range,
+            "total_entries": len(entries),
+        }
+    except Exception as exc:
+        logger.exception("list_sensors failed")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def search_logs_by_sensor(
+    sensor: str,
+    time_range: str = "24h",
+    limit: int = 100,
+) -> dict:
+    """
+    Search OCI logs filtered by a specific sensor name.
+
+    Args:
+        sensor:     Sensor name to filter on, e.g. 'ssh_22', 'cowrie'.
+        time_range: How far back to look, e.g. '24h', '7d'.
+        limit:      Maximum number of entries to return.
+
+    Returns:
+        A dict with 'sensor', 'time_range', 'total', and 'entries' keys.
+    """
+    query = (
+        f"search \"{_COMPARTMENT_ID}/{_LOG_GROUP_ID}/{_LOG_ID}\" "
+        f"| where data.sensor = '{sensor}' "
+        f"| sort by datetime desc"
+    )
+
+    try:
+        entries = _execute_search(query, time_range, limit)
+        return {"sensor": sensor, "time_range": time_range, "total": len(entries), "entries": entries}
+    except Exception as exc:
+        logger.exception("search_logs_by_sensor failed")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
 def resolve_ocid(ocid: str) -> dict:
     """
     Resolve an OCI resource OCID to its human-readable display name.
