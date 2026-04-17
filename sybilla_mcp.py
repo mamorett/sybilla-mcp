@@ -418,7 +418,7 @@ def search_logs_by_sensor(
     """
     query = (
         f"search \"{_COMPARTMENT_ID}/{_LOG_GROUP_ID}/{_LOG_ID}\" "
-        f"| where data.sensor = '{sensor}' "
+        f"| where data.Sensor = '{sensor}' "
         f"| sort by datetime desc"
     )
 
